@@ -60,6 +60,7 @@ export interface AutomodConfig {
   antilink_action: 'delete' | 'warn' | 'timeout';
   badwords: string[];
   badwords_action: BadwordPunishment;
+  badwords_profanity_action: BadwordPunishment;
   badwords_severe_action: BadwordPunishment;
   max_mentions: number;
   max_mentions_action: 'delete' | 'warn' | 'timeout';

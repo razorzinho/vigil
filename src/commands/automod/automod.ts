@@ -15,7 +15,11 @@ import {
 } from '../../database/repositories/automod';
 import { guildSettingsRepo } from '../../database/repositories/guildSettings';
 import { BadwordPunishment } from '../../types/database';
-import { DEFAULT_BADWORDS_PRESET, isSevereBadword } from '../../utils/textNormalizer';
+import {
+  DEFAULT_BADWORDS_PRESET,
+  BadwordSeverity,
+  getBadwordSeverity,
+} from '../../utils/textNormalizer';
 import { successEmbed, errorEmbed, infoEmbed } from '../../utils/embeds';
 import { logger } from '../../utils/logger';
 
@@ -122,8 +126,9 @@ const command: Command = {
             .setDescription('Nível de severidade (Tier) para adicionar a palavra ou configurar a punição')
             .setRequired(false)
             .addChoices(
-              { name: 'Nível 1 — Ofensas Graves', value: 'severe' },
-              { name: 'Nível 2 — Termos Restritos, Debates e Memes', value: 'moderate' },
+              { name: 'Nível 1 — Ofensas Graves, Racismo e Crimes', value: 'severe' },
+              { name: 'Nível 2 — Palavrões Comuns e Xingamentos', value: 'profanity' },
+              { name: 'Nível 3 — Termos Restritos, Debates e Memes', value: 'moderate' },
             ),
         )
         .addStringOption(option =>
@@ -338,10 +343,16 @@ async function handleAntilink(interaction: ChatInputCommandInteraction, guildId:
   });
 }
 
+const TIER_TITLES: Record<BadwordSeverity, string> = {
+  severe: '🔇 Nível 1 — Ofensas Graves, Racismo e Crimes',
+  profanity: '🤬 Nível 2 — Palavrões Comuns e Xingamentos',
+  moderate: '⚠️ Nível 3 — Termos Restritos, Debates e Memes',
+};
+
 async function handleBadwords(interaction: ChatInputCommandInteraction, guildId: string) {
   const action = interaction.options.getString('action', true);
   const wordInput = interaction.options.getString('word');
-  const tierOption = interaction.options.getString('tier') as 'severe' | 'moderate' | null;
+  const tierOption = interaction.options.getString('tier') as BadwordSeverity | null;
   const punishment = interaction.options.getString('punishment') as BadwordPunishment | null;
 
   if (action === 'config') {
@@ -350,7 +361,7 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
         embeds: [
           errorEmbed(
             'Parâmetros Obrigatórios',
-            'Para configurar a punição de um nível, informe tanto **`tier`** (Nível 1 ou Nível 2) quanto **`punishment`** (a severidade da punição).',
+            'Para configurar a punição de um nível, informe tanto **`tier`** (Nível 1, Nível 2 ou Nível 3) quanto **`punishment`** (a severidade da punição).',
           ),
         ],
         flags: MessageFlags.Ephemeral,
@@ -367,16 +378,11 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
       return;
     }
 
-    const tierName =
-      tierOption === 'severe'
-        ? '🔇 Nível 1 — Ofensas Graves'
-        : '⚠️ Nível 2 — Termos Restritos, Debates e Memes';
-
     await interaction.reply({
       embeds: [
         successEmbed(
           'Punição do Nível Atualizada',
-          `**Nível:** ${tierName}\n` +
+          `**Nível:** ${TIER_TITLES[tierOption]}\n` +
             `**Nova Punição:** ${BADWORD_PUNISHMENT_SHORT_LABELS[punishment]}\n` +
             `**Descrição:** *${BADWORD_PUNISHMENT_DESCRIPTIONS[punishment]}*`,
         ),
@@ -394,6 +400,7 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
     const config = await automodRepo.getConfig(guildId);
     const words = config?.badwords ?? DEFAULT_BADWORDS_PRESET;
     const severePunishment: BadwordPunishment = config?.badwords_severe_action ?? 'timeout';
+    const profanityPunishment: BadwordPunishment = config?.badwords_profanity_action ?? 'warn';
     const moderatePunishment: BadwordPunishment = config?.badwords_action ?? 'warn';
 
     if (words.length === 0) {
@@ -410,30 +417,43 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
     }
 
     const severeList = words
-      .filter(w => isSevereBadword(w))
-      .map(w => w.replace(/^!+/, ''))
+      .filter(w => getBadwordSeverity(w) === 'severe')
+      .map(w => w.replace(/^[!?]+/, ''))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map(w => `\`${w}\``);
+
+    const profanityList = words
+      .filter(w => getBadwordSeverity(w) === 'profanity')
+      .map(w => w.replace(/^[!?]+/, ''))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'))
       .map(w => `\`${w}\``);
 
     const moderateList = words
-      .filter(w => !isSevereBadword(w))
+      .filter(w => getBadwordSeverity(w) === 'moderate')
+      .map(w => w.replace(/^[!?]+/, ''))
       .sort((a, b) => a.localeCompare(b, 'pt-BR'))
       .map(w => `\`${w}\``);
 
-    const truncateText = (items: string[], maxLen = 3700) => {
+    const truncateText = (items: string[], maxLen = 1700) => {
       if (items.length === 0) return '*Nenhuma palavra cadastrada neste nível.*';
       const joined = items.join(', ');
       return joined.length > maxLen ? joined.slice(0, maxLen) + '...' : joined;
     };
 
     const severeEmbed = infoEmbed(
-      `🔇 Nível 1 — Ofensas Graves (${severeList.length})`,
+      `🔇 Nível 1 — Ofensas Graves, Racismo e Crimes (${severeList.length})`,
       `**Ação Configurada:** ${BADWORD_PUNISHMENT_SHORT_LABELS[severePunishment]} — *${BADWORD_PUNISHMENT_DESCRIPTIONS[severePunishment]}*\n\n` +
         truncateText(severeList),
     );
 
+    const profanityEmbed = infoEmbed(
+      `🤬 Nível 2 — Palavrões Comuns e Xingamentos (${profanityList.length})`,
+      `**Ação Configurada:** ${BADWORD_PUNISHMENT_SHORT_LABELS[profanityPunishment]} — *${BADWORD_PUNISHMENT_DESCRIPTIONS[profanityPunishment]}*\n\n` +
+        truncateText(profanityList),
+    );
+
     const moderateEmbed = infoEmbed(
-      `⚠️ Nível 2 — Termos Restritos, Debates e Memes (${moderateList.length})`,
+      `⚠️ Nível 3 — Termos Restritos, Debates e Memes (${moderateList.length})`,
       `**Ação Configurada:** ${BADWORD_PUNISHMENT_SHORT_LABELS[moderatePunishment]} — *${BADWORD_PUNISHMENT_DESCRIPTIONS[moderatePunishment]}*\n\n` +
         truncateText(moderateList),
     );
@@ -451,7 +471,7 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
       content:
         `📋 **Total de regras ativas no detector:** \`${words.length}\` *(palavras com \`*\` no fim capturam qualquer sufixo)*\n` +
         `📢 **Canal de Logs do AutoMod:** ${logChannelInfo}`,
-      embeds: [severeEmbed, moderateEmbed],
+      embeds: [severeEmbed, profanityEmbed, moderateEmbed],
       flags: MessageFlags.Ephemeral,
     });
     return;
@@ -505,16 +525,19 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
   }
 
   if (action === 'add') {
-    const targetTier: 'severe' | 'moderate' =
+    const targetTier: BadwordSeverity =
       tierOption ??
       (punishment === 'timeout' || punishment === 'kick' || punishment === 'ban'
         ? 'severe'
         : 'moderate');
 
     const wordsToSave = parsedWords.map(w => {
-      const clean = w.replace(/^!+/, '');
-      if (targetTier === 'severe' && !isSevereBadword(clean)) {
+      const clean = w.replace(/^[!?]+/, '');
+      if (targetTier === 'severe' && getBadwordSeverity(clean) !== 'severe') {
         return `!${clean}`;
+      }
+      if (targetTier === 'profanity' && getBadwordSeverity(clean) !== 'profanity') {
+        return `?${clean}`;
       }
       return clean;
     });
@@ -536,14 +559,13 @@ async function handleBadwords(interaction: ChatInputCommandInteraction, guildId:
     const activePunishment: BadwordPunishment =
       targetTier === 'severe'
         ? (result.badwords_severe_action ?? 'timeout')
-        : (result.badwords_action ?? 'warn');
+        : targetTier === 'profanity'
+          ? (result.badwords_profanity_action ?? 'warn')
+          : (result.badwords_action ?? 'warn');
 
-    const tierLabel =
-      targetTier === 'severe'
-        ? `Nível 1 — Ofensas Graves (${BADWORD_PUNISHMENT_DESCRIPTIONS[activePunishment]})`
-        : `Nível 2 — Termos Restritos (${BADWORD_PUNISHMENT_DESCRIPTIONS[activePunishment]})`;
+    const tierLabel = `${TIER_TITLES[targetTier]} (${BADWORD_PUNISHMENT_DESCRIPTIONS[activePunishment]})`;
 
-    const listStr = parsedWords.map(w => `\`${w.replace(/^!+/, '')}\``).join(', ');
+    const listStr = parsedWords.map(w => `\`${w.replace(/^[!?]+/, '')}\``).join(', ');
     await interaction.reply({
       embeds: [
         successEmbed(

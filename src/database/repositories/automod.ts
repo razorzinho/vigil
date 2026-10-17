@@ -1,6 +1,10 @@
 import { getDbPool } from '../client';
 import { AutomodConfig, BadwordPunishment } from '../../types/database';
-import { DEFAULT_BADWORDS_PRESET } from '../../utils/textNormalizer';
+import {
+  DEFAULT_BADWORDS_PRESET,
+  DEPRECATED_PRESET_WORDS,
+  BadwordSeverity,
+} from '../../utils/textNormalizer';
 import { logger } from '../../utils/logger';
 
 export const BADWORD_PUNISHMENT_DESCRIPTIONS: Record<BadwordPunishment, string> = {
@@ -19,8 +23,8 @@ export const BADWORD_PUNISHMENT_SHORT_LABELS: Record<BadwordPunishment, string> 
   ban: '🔨 Deletar + Banir (Ban)',
 };
 
-// Controle em memória para garantir que novas palavras adicionadas ao preset no código
-// e a coluna badwords_severe_action sejam sincronizadas automaticamente no banco ao iniciar o bot
+// Controle em memória para garantir que novas palavras adicionadas ou removidas do preset no código
+// e as colunas adicionais sejam sincronizadas automaticamente no banco ao iniciar o bot
 const syncedGuildsOnStartup = new Set<string>();
 let schemaChecked = false;
 
@@ -30,6 +34,7 @@ async function ensureAutomodSchema(): Promise<void> {
     await getDbPool().query(`
       ALTER TABLE torquemada.automod_config
         ADD COLUMN IF NOT EXISTS badwords_severe_action TEXT DEFAULT 'timeout',
+        ADD COLUMN IF NOT EXISTS badwords_profanity_action TEXT DEFAULT 'warn',
         ADD COLUMN IF NOT EXISTS log_channel_id TEXT
     `);
     schemaChecked = true;
@@ -44,7 +49,7 @@ async function ensureAutomodSchema(): Promise<void> {
 export const automodRepo = {
   /**
    * Obtém a configuração de automod de um servidor.
-   * Se ainda não existir registro ou se houver novas palavras no preset do código, sincroniza automaticamente.
+   * Se ainda não existir registro ou se houver alterações no preset do código, sincroniza automaticamente.
    */
   async getConfig(guildId: string): Promise<AutomodConfig | null> {
     try {
@@ -61,6 +66,7 @@ export const automodRepo = {
           enabled: true,
           badwords: DEFAULT_BADWORDS_PRESET,
           badwords_action: 'warn',
+          badwords_profanity_action: 'warn',
           badwords_severe_action: 'timeout',
         });
       }
@@ -68,19 +74,39 @@ export const automodRepo = {
       if (!syncedGuildsOnStartup.has(guildId)) {
         syncedGuildsOnStartup.add(guildId);
         const currentSet = new Set(existing.badwords ?? []);
-        let addedAny = false;
+        let changedWords = false;
+
+        // 1. Remover palavras antigas que foram descartadas do preset por serem exageradas
+        for (const w of Array.from(currentSet)) {
+          const clean = w.toLowerCase().trim().replace(/^[!?]+/, '');
+          if (DEPRECATED_PRESET_WORDS.has(clean)) {
+            currentSet.delete(w);
+            changedWords = true;
+          }
+        }
+
+        // 2. Adicionar palavras novas do preset atual
         for (const presetWord of DEFAULT_BADWORDS_PRESET) {
           if (!currentSet.has(presetWord)) {
             currentSet.add(presetWord);
-            addedAny = true;
+            changedWords = true;
           }
         }
+
         const needsSevereDefault = !existing.badwords_severe_action;
-        if (addedAny || !existing.badwords || existing.badwords.length === 0 || needsSevereDefault) {
+        const needsProfanityDefault = !existing.badwords_profanity_action;
+        if (
+          changedWords ||
+          !existing.badwords ||
+          existing.badwords.length === 0 ||
+          needsSevereDefault ||
+          needsProfanityDefault
+        ) {
           return await this.upsertConfig(guildId, {
             enabled: true,
             badwords: Array.from(currentSet),
             ...(needsSevereDefault ? { badwords_severe_action: 'timeout' } : {}),
+            ...(needsProfanityDefault ? { badwords_profanity_action: 'warn' } : {}),
           });
         }
       }
@@ -145,17 +171,19 @@ export const automodRepo = {
   },
 
   /**
-   * Define a severidade de punição para um nível específico (Nível 1 = 'severe', Nível 2 = 'moderate').
+   * Define a severidade de punição para um nível específico (Nível 1 = 'severe', Nível 2 = 'profanity', Nível 3 = 'moderate').
    */
   async setTierPunishment(
     guildId: string,
-    tier: 'severe' | 'moderate',
+    tier: BadwordSeverity,
     punishment: BadwordPunishment,
   ): Promise<AutomodConfig | null> {
     const updateData: Partial<AutomodConfig> =
       tier === 'severe'
         ? { badwords_severe_action: punishment }
-        : { badwords_action: punishment };
+        : tier === 'profanity'
+          ? { badwords_profanity_action: punishment }
+          : { badwords_action: punishment };
     return this.upsertConfig(guildId, updateData);
   },
 
@@ -173,7 +201,7 @@ export const automodRepo = {
     guildId: string,
     words: string[],
     action?: BadwordPunishment,
-    tier?: 'severe' | 'moderate',
+    tier?: BadwordSeverity,
   ): Promise<AutomodConfig | null> {
     const config = await this.getConfig(guildId);
     const currentSet = new Set(config?.badwords ?? DEFAULT_BADWORDS_PRESET);
@@ -181,10 +209,11 @@ export const automodRepo = {
     for (const w of words) {
       const normalized = w.toLowerCase().trim();
       if (normalized.length > 0) {
-        // Se antes estava no outro nível (com ou sem '!'), substitui para não duplicar
-        const clean = normalized.replace(/^!+/, '');
+        // Se antes estava em outro nível (com '!', '?' ou sem prefixo), substitui para não duplicar
+        const clean = normalized.replace(/^[!?]+/, '');
         currentSet.delete(clean);
         currentSet.delete(`!${clean}`);
+        currentSet.delete(`?${clean}`);
         currentSet.add(normalized);
       }
     }
@@ -196,6 +225,8 @@ export const automodRepo = {
     if (action) {
       if (tier === 'severe') {
         updateData.badwords_severe_action = action;
+      } else if (tier === 'profanity') {
+        updateData.badwords_profanity_action = action;
       } else {
         updateData.badwords_action = action;
       }
@@ -219,9 +250,10 @@ export const automodRepo = {
     const currentWords = config?.badwords ?? [];
     const toRemove = new Set<string>();
     for (const w of words) {
-      const clean = w.toLowerCase().trim().replace(/^!+/, '');
+      const clean = w.toLowerCase().trim().replace(/^[!?]+/, '');
       toRemove.add(clean);
       toRemove.add(`!${clean}`);
+      toRemove.add(`?${clean}`);
     }
     const filtered = currentWords.filter(w => !toRemove.has(w.toLowerCase().trim()));
 

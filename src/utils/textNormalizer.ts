@@ -56,7 +56,6 @@ const STRICT_EXACT_WORDS = new Set([
   'fspx',
   'sspx',
   'chad',
-  'aura',
   'yag',
   'crl',
   'crlh',
@@ -103,11 +102,12 @@ const SINGLE_LETTER_SPACE_ONLY = new Set([
   'puto',
   'porra',
   'corno',
+  'bosta',
+  'merda',
   'foda',
   'fode',
   'foder',
   'fodi',
-  'aura',
   'furry',
   'econe',
   'spx',
@@ -131,23 +131,25 @@ const SINGLE_LETTER_SPACE_ONLY = new Set([
   'wtf',
 ]);
 
+export type BadwordSeverity = 'severe' | 'profanity' | 'moderate';
+
 /**
- * Nível 1: Ofensas Graves (Racismo, Nazismo, Crimes, Homofobia, Discurso de Ódio e Palavrões Pesados).
- * Ação automática no Torquemada: Deleta a mensagem + Aplica Timeout (castigo) + Avisa no chat.
+ * Nível 1: Ofensas Graves (Racismo, Nazismo, Antissemitismo, Discurso de Ódio, Crimes e Ofensas Pesadas Diretas).
+ * Punição padrão: Deleta a mensagem + Timeout automático (1 min) + Aviso no chat.
  */
 export const SEVERE_BADWORDS: string[] = [
-  // 1. Racismo, Nazismo, Antissemitismo e Discurso de Ódio
+  // 1. Racismo, Nazismo, Antissemitismo, Discurso de Ódio e Crimes
   'macaco',
   'seu macaco',
   'macaco preto',
   'preto macaco',
-  'pretinh',
+  'pretinh*',
   'mutambo',
   'crioulo',
-  'crioulinh',
+  'crioulinh*',
   'criolo',
-  'criolinh',
-  'negrinh',
+  'criolinh*',
+  'negrinh*',
   'ne gro',
   'nigg*',
   'hitler',
@@ -165,32 +167,38 @@ export const SEVERE_BADWORDS: string[] = [
   'odeio negros',
   'odeio judeu',
   'odeio judeus',
-  'lugar de mulher',
+  'pedofil*',
+  'zoofil*',
 
-  // 2. Palavrões Pesados, Obscenidades, Anatomia Explícita e Crimes
+  // 2. Ofensas Diretas Pesadas e Obscenidades Explícitas
   'arrombado',
   'arrombada',
-  'babaca',
   'buceta',
   'punheta',
-  'caralho',
-  'caralinho',
-  'crl',
-  'crlh',
-  'krl',
-  'cacete',
   'meu pau',
   'meu pal',
   'chupa meu',
   'suck my',
-  'corno',
-  'cu',
-  'cuzao',
-  'cuzinho',
-  'desgraç*',
   'fdp',
   'filho da puta',
   'filha da puta',
+  'vai pra puta que pariu',
+  'vai se foder',
+  'vai tomar no cu',
+  'penis',
+  'vagina',
+  'anus',
+  'testiculo',
+  'cum',
+];
+
+/**
+ * Nível 2: Palavrões Comuns, Xingamentos Leves e Expressões Vulgares.
+ * Punição padrão: Deleta a mensagem + Envia aviso rápido no chat (sem Timeout).
+ */
+export const PROFANITY_BADWORDS: string[] = [
+  'merda',
+  'bosta',
   'foda',
   'foda-se',
   'fodase',
@@ -199,49 +207,50 @@ export const SEVERE_BADWORDS: string[] = [
   'fodi',
   'fodido',
   'fodida',
-  'piranha',
-  'pnc',
   'porra',
   'que porra e essa',
   'pqp',
   'prr',
   'puta',
-  'puto',
   'puta que pariu',
-  'vai pra puta que pariu',
-  'vai se foder',
-  'vai tomar no cu',
+  'caralho',
+  'caralinho',
+  'crl',
+  'crlh',
+  'krl',
+  'cacete',
+  'cu',
+  'cuzao',
+  'cuzinho',
+  'bunda',
+  'pinto',
+  'corno',
+  'babaca',
+  'piranha',
+  'desgraç*',
+  'idiota',
+  'otario',
+  'tua mae',
+  'transar',
+  'transei',
+  'viado',
+  'veado',
+  'gay',
+  'yag',
+  'pnc',
   'tmc',
   'tnc',
   'vsf',
   'vsfd',
   'vtmnc',
-  'transar',
-  'transei',
-  'penis',
-  'vagina',
-  'anus',
-  'testiculo',
-  'pinto',
-  'bunda',
-  'cum',
-  'pedofil*',
-  'zoofil*',
-  'viado',
-  'veado',
-  'gay',
-  'yag',
-  'idiota',
-  'otario',
-  'tua mae',
 ];
 
 /**
- * Nível 2: Termos Restritos, Debates Eclesiásticos (Cisma/FSSPX/CVII) e Memes/Gírias.
- * Ação automática no Torquemada: Deleta a mensagem + Envia aviso rápido no chat (sem timeout).
+ * Nível 3: Termos Restritos, Debates Eclesiásticos (Cisma/FSSPX/CVII) e Memes/Gírias.
+ * Punição padrão: Deleta a mensagem + Envia aviso rápido no chat (sem Timeout).
  */
 export const MODERATE_BADWORDS: string[] = [
-  // 3. Gírias, Memes, Siglas Leves e Trolls Internos
+  // Gírias, Memes, Siglas Leves e Trolls Internos
   '20+20+20+7',
   '67',
   'meia sete',
@@ -264,7 +273,7 @@ export const MODERATE_BADWORDS: string[] = [
   'furry',
   'dh',
 
-  // 4. Termos de Cisma / Debates Eclesiásticos Restritos
+  // Termos de Cisma / Debates Eclesiásticos Restritos
   'lefeb*',
   'dom marcel',
   'marcel lefebvre',
@@ -299,26 +308,86 @@ export const MODERATE_BADWORDS: string[] = [
   'cardeal tucho',
   'tucho',
   'modernis*',
-  'moderninho'
+  'moderninho',
 ];
 
+/**
+ * Palavras antigas do preset que foram removidas por serem exageradas ou substituídas por prefixos melhores.
+ * São limpas automaticamente do banco na inicialização do servidor.
+ */
+export const DEPRECATED_PRESET_WORDS = new Set([
+  'aura',
+  'farmar aura',
+  'farmou aura',
+  'based',
+  'chad',
+  'comando vermelho',
+  'a fraternidade',
+  'fraternidade',
+  'concilio vaticano',
+  'concilio segundo',
+  'vatecano',
+  'documentos conciliares',
+  'excomun*',
+  'escomun*',
+  'ixcomun*',
+  'exkomun*',
+  'maçon*',
+  'massonaria',
+  'maçom',
+  'maçons',
+  'malçon',
+  'mason',
+  'sagraç*',
+  'mandato episcopal',
+  'sedevacan*',
+  'vacante',
+  'herege',
+  'heregis',
+  'lugar de mulher',
+  'puto',
+  'pretinh',
+  'crioulinh',
+  'criolinh',
+  'negrinh',
+  'negrinho',
+  'chupa meu pau',
+]);
+
 const SEVERE_BADWORDS_SET = new Set(SEVERE_BADWORDS.map(w => w.toLowerCase().trim()));
+const PROFANITY_BADWORDS_SET = new Set(PROFANITY_BADWORDS.map(w => w.toLowerCase().trim()));
 
 /**
- * Lista padrão unificada (Ofensas Graves primeiro para terem prioridade na punição, seguidas dos Termos Restritos).
+ * Lista padrão unificada (Ofensas Graves -> Palavrões Comuns -> Termos Restritos).
  */
 export const DEFAULT_BADWORDS_PRESET: string[] = [
   ...SEVERE_BADWORDS,
+  ...PROFANITY_BADWORDS,
   ...MODERATE_BADWORDS,
 ];
 
 /**
- * Verifica se uma regra pertence à lista de ofensas graves (que exigem Timeout).
- * Palavras adicionadas manualmente com prefixo "!" (ex: "!palavra") também são tratadas como graves.
+ * Retorna a categoria/severidade de uma regra:
+ * - 'severe': Nível 1 — Ofensas Graves (prefixo '!' ou presente em SEVERE_BADWORDS)
+ * - 'profanity': Nível 2 — Palavrões Comuns (prefixo '?' ou presente em PROFANITY_BADWORDS)
+ * - 'moderate': Nível 3 — Termos Restritos / Debates / Memes (demais regras)
  */
-export function isSevereBadword(rule: string): boolean {
+export function getBadwordSeverity(rule: string): BadwordSeverity {
   const clean = rule.trim().toLowerCase();
-  return clean.startsWith('!') || SEVERE_BADWORDS_SET.has(clean);
+  if (clean.startsWith('!')) return 'severe';
+  if (clean.startsWith('?')) return 'profanity';
+  const stripped = clean.replace(/^[!?]+/, '').trim();
+  if (SEVERE_BADWORDS_SET.has(stripped)) return 'severe';
+  if (PROFANITY_BADWORDS_SET.has(stripped)) return 'profanity';
+  return 'moderate';
+}
+
+export function isSevereBadword(rule: string): boolean {
+  return getBadwordSeverity(rule) === 'severe';
+}
+
+export function isProfanityBadword(rule: string): boolean {
+  return getBadwordSeverity(rule) === 'profanity';
 }
 
 /**
@@ -474,7 +543,7 @@ function getCharRegexPattern(char: string, nextChar?: string, hadCedilla?: boole
     case 'k':
       return '[kc]+';
     case 'l':
-      return '[l1!|i]+';
+      return '[l1!|]+';
     case 'm':
       return 'm+';
     case 'n':
@@ -569,9 +638,9 @@ function buildSingleWordPattern(rawToken: string, isPhrasePart: boolean): string
 
   const corePattern = joinLetters(charPatterns);
 
-  // 1. Raiz de prefixo (ex: excomun*, lefeb*, beijoq*, nigg*): aceita qualquer continuação
+  // 1. Raiz de prefixo (ex: lefeb*, beijoq*, nigg*, pretinh*): aceita qualquer continuação e captura a palavra inteira
   if (isPrefix) {
-    return corePattern;
+    return `${corePattern}[a-z0-9]*`;
   }
 
   // 2. Palavras estritas (ex: cum, cu, anus, dh, cvii, siglas): apenas plural 's' opcional
@@ -621,7 +690,7 @@ const compiledRuleCache = new Map<string, RegExp>();
  * Compila uma regra (palavra, prefixo com '*' ou frase) em um RegExp otimizado.
  */
 export function compileBadwordRule(rawRule: string): RegExp | null {
-  const trimmed = rawRule.trim().toLowerCase().replace(/^!+/, '').trim();
+  const trimmed = rawRule.trim().toLowerCase().replace(/^[!?]+/, '').trim();
   if (!trimmed) return null;
 
   const cached = compiledRuleCache.get(trimmed);
@@ -666,7 +735,7 @@ export function compileBadwordRule(rawRule: string): RegExp | null {
     const rightBoundary = endsWithWildcard ? '' : '(?![a-z0-9])';
     regex = new RegExp(`(?<![a-z0-9])${pattern}${rightBoundary}`, 'i');
   } else {
-    // Frase composta (ex: "odeio gay", "lugar de mulher", "concilio vaticano", "dom marcel")
+    // Frase composta (ex: "odeio gay", "concilio vaticano", "dom marcel")
     const tokenPatterns = tokens.map((t, idx) =>
       buildSingleWordPattern(t, idx < tokens.length - 1),
     );
@@ -682,14 +751,14 @@ export function compileBadwordRule(rawRule: string): RegExp | null {
 
 export interface BlockedWordMatch {
   word: string;
-  severity: 'severe' | 'moderate';
+  severity: BadwordSeverity;
   matchedText: string;
   highlightedText: string;
 }
 
 /**
  * Verifica se o texto de uma mensagem de chat contém alguma palavra ou frase proibida,
- * priorizando ofensas graves (que exigem Timeout) antes dos termos restritos moderados,
+ * priorizando ofensas graves ('severe') -> palavrões comuns ('profanity') -> termos restritos ('moderate'),
  * e extraindo o trecho exato encontrado no texto original.
  */
 export function findBlockedWordDetailed(
@@ -703,7 +772,7 @@ export function findBlockedWordDetailed(
 
   const buildMatchResult = (
     rawWord: string,
-    severity: 'severe' | 'moderate',
+    severity: BadwordSeverity,
     execMatch: RegExpExecArray,
   ): BlockedWordMatch => {
     const startIdx = execMatch.index;
@@ -711,18 +780,18 @@ export function findBlockedWordDetailed(
     const origStart = spans[startIdx]?.start ?? 0;
     const origEnd = spans[endIdx]?.end ?? text.length;
     const matchedText = text.slice(origStart, origEnd).trim() || execMatch[0].trim();
-    // Ajustar destaque no texto original
     const exactSub = text.slice(origStart, origEnd);
     const highlightedText = `${text.slice(0, origStart)}**[${exactSub}]**${text.slice(origEnd)}`;
 
     return {
-      word: rawWord.replace(/^!+/, ''),
+      word: rawWord.replace(/^[!?]+/, ''),
       severity,
       matchedText,
       highlightedText,
     };
   };
 
+  let profanityMatch: BlockedWordMatch | null = null;
   let moderateMatch: BlockedWordMatch | null = null;
 
   for (const rawWord of blockedWords) {
@@ -731,16 +800,19 @@ export function findBlockedWordDetailed(
 
     const execMatch = regex.exec(preprocessed);
     if (execMatch) {
-      if (isSevereBadword(rawWord)) {
+      const severity = getBadwordSeverity(rawWord);
+      if (severity === 'severe') {
         return buildMatchResult(rawWord, 'severe', execMatch);
       }
-      if (!moderateMatch) {
+      if (severity === 'profanity' && !profanityMatch) {
+        profanityMatch = buildMatchResult(rawWord, 'profanity', execMatch);
+      } else if (severity === 'moderate' && !moderateMatch) {
         moderateMatch = buildMatchResult(rawWord, 'moderate', execMatch);
       }
     }
   }
 
-  return moderateMatch;
+  return profanityMatch ?? moderateMatch;
 }
 
 /**

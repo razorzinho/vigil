@@ -53,6 +53,7 @@ function getFallbackConfig(guildId: string): AutomodConfig {
     antilink_action: 'delete',
     badwords: DEFAULT_BADWORDS_PRESET,
     badwords_action: 'warn',
+    badwords_profanity_action: 'warn',
     badwords_severe_action: 'timeout',
     max_mentions: 0,
     max_mentions_action: 'delete',
@@ -140,21 +141,26 @@ async function runChecks(
     }
   }
 
-  // Check badwords (com motor anti-ofuscação e 2 níveis de severidade configuráveis)
+  // Check badwords (com motor anti-ofuscação e 3 níveis de severidade configuráveis)
   const activeBadwords =
     config.badwords && config.badwords.length > 0 ? config.badwords : DEFAULT_BADWORDS_PRESET;
 
   if (activeBadwords.length > 0) {
     const match = checkBadwords(message, activeBadwords);
     if (match) {
-      const isSevere = match.severity === 'severe';
-      const punishment: BadwordPunishment = isSevere
-        ? (config.badwords_severe_action ?? 'timeout')
-        : (config.badwords_action ?? 'warn');
+      const punishment: BadwordPunishment =
+        match.severity === 'severe'
+          ? (config.badwords_severe_action ?? 'timeout')
+          : match.severity === 'profanity'
+            ? (config.badwords_profanity_action ?? 'warn')
+            : (config.badwords_action ?? 'warn');
 
-      const reason = isSevere
-        ? 'AutoMod: ofensa grave ou palavra proibida detectada'
-        : 'AutoMod: termo ou assunto restrito detectado';
+      const reason =
+        match.severity === 'severe'
+          ? 'AutoMod: ofensa grave ou palavra proibida detectada'
+          : match.severity === 'profanity'
+            ? 'AutoMod: palavrão ou linguagem imprópria detectada'
+            : 'AutoMod: termo ou assunto restrito detectado';
 
       // 1. Executa a ação de punição imediatamente (deleta a mensagem + aplica punição do tier)
       await takeAction(message, punishment, reason);
@@ -194,9 +200,18 @@ async function logBadwordViolation(
   const guild = message.guild!;
   const author = message.author;
   const isSevere = match.severity === 'severe';
-  const tierLabel = isSevere
-    ? '🔇 Nível 1 — Ofensas Graves'
-    : '⚠️ Nível 2 — Termos Restritos / Debates / Memes';
+  const tierLabel =
+    match.severity === 'severe'
+      ? '🔇 Nível 1 — Ofensas Graves, Racismo e Crimes'
+      : match.severity === 'profanity'
+        ? '🤬 Nível 2 — Palavrões Comuns e Xingamentos'
+        : '⚠️ Nível 3 — Termos Restritos, Debates e Memes';
+  const tierConsoleShort =
+    match.severity === 'severe'
+      ? 'Nível 1 (Grave)'
+      : match.severity === 'profanity'
+        ? 'Nível 2 (Palavrão Comum)'
+        : 'Nível 3 (Restrito)';
   const punishmentWritten =
     BADWORD_PUNISHMENT_DESCRIPTIONS[punishment] ?? BADWORD_PUNISHMENT_DESCRIPTIONS.warn;
   const punishmentShort =
@@ -211,7 +226,7 @@ async function logBadwordViolation(
       `Servidor: ${guild.name} (${guild.id}) | ` +
       `Canal: ${channelName} | ` +
       `Autor: ${author.tag} (${author.id}) | ` +
-      `Tier: ${isSevere ? 'Nível 1 (Grave)' : 'Nível 2 (Restrito)'} | ` +
+      `Tier: ${tierConsoleShort} | ` +
       `Regra acionada: "${match.word}" | ` +
       `Trecho exato encontrado: "${match.matchedText}" | ` +
       `Mensagem destacada: "${match.highlightedText}" | ` +
@@ -226,7 +241,7 @@ async function logBadwordViolation(
       author.id,
       client.user?.id ?? 'automod',
       `automod_${punishment}`,
-      `AutoMod (${isSevere ? 'Nível 1' : 'Nível 2'}): palavra/trecho "${match.matchedText}" (regra: ${match.word})`,
+      `AutoMod (${tierConsoleShort}): palavra/trecho "${match.matchedText}" (regra: ${match.word})`,
       punishment === 'timeout' ? '1m' : null,
       {
         rule: match.word,

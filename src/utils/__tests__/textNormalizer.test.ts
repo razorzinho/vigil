@@ -23,11 +23,6 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['macaco preto', 'frase racista'],
   ['preto macaco', 'frase racista invertida'],
 
-  // Homóglifos cirílicos (exatamente como enviado na lista original)
-  ['A Frаtеrnidade', 'A Fraternidade com "a" e "e" cirílicos'],
-  ['Fra ter ni da de', 'Fraternidade separada em sílabas em frase'],
-  ['a fra ter ni da de', 'a fraternidade separada em sílabas'],
-
   // Racismo e Nazismo
   ['nigger', 'slur direto'],
   ['n i g g e r', 'slur espaçado'],
@@ -44,7 +39,6 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['odeio negros', 'frase de ódio'],
   ['oDEIO gAY', 'frase de ódio case misto'],
   ['odeio mulher', 'frase de ódio'],
-  ['lugar de mulher é na cozinha', 'frase machista'],
 
   // Palavrões, Anatomia e Obscenidades
   ['buceta', 'buceta'],
@@ -99,20 +93,12 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['M A M B O', 'mambo espaçado'],
   ['mam bo', 'mambo em sílabas'],
   ['Mamb o', 'mambo separado'],
-  ['b a s e d', 'based espaçado'],
-  ['farmar aura', 'farmar aura'],
 
   // Termos de Cisma / Debates Eclesiásticos
   ['c i s m a', 'cisma espaçado'],
   ['cis ma ti co', 'cismático em sílabas'],
   ['cis má ti co', 'cismático com acento em sílabas'],
   ['cismaram', 'cismaram'],
-  ['e x c o m u n g a d o', 'excomungado espaçado'],
-  ['E X C O M U N H Ã O', 'excomunhão espaçada'],
-  ['Ex co mun ga do', 'excomungado em sílabas'],
-  ['escomungado', 'escomungado com s'],
-  ['ixcomungado', 'ixcomungado com ix'],
-  ['exkomungado', 'exkomungado com k'],
   ['Le fe bv re', 'Lefebvre em sílabas'],
   ['lefebrve', 'Lefebvre com typo'],
   ['lefebvrista', 'lefebvrista derivado'],
@@ -123,16 +109,18 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['CV II', 'CV II'],
   ['Concílio Vaticano II', 'Concílio Vaticano II'],
   ['concílio vaticano 2', 'concílio vaticano 2'],
+  ['Tu cho', 'Tucho separado'],
   ['mo der nis ta', 'modernista em sílabas'],
   ['M O D E R N I S T A', 'modernista espaçado'],
-  ['maçonaria', 'maçonaria'],
-  ['massonaria', 'massonaria com ss'],
-  ['malçon', 'malçon'],
-  ['Tu cho', 'Tucho separado'],
-  ['Va can te', 'Vacante em sílabas'],
-  ['sedevacantista', 'sedevacantista via prefixo sedevacan*'],
 
   // Nova lista de palavras e expressões adicionadas
+  ['pretinho', 'pretinho via pretinh*'],
+  ['pretinha', 'pretinha via pretinh*'],
+  ['crioulinho', 'crioulinho via crioulinh*'],
+  ['negrinha', 'negrinha via negrinh*'],
+  ['roku nana', 'meme 67 em japonês'],
+  ['meu pal', 'variação com l de meu pau'],
+  ['suck my', 'expressão em inglês'],
   ['67', 'meme 67 isolado'],
   ['6 7', 'meme 67 espaçado'],
   ['meia sete', 'meia sete'],
@@ -176,7 +164,6 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['PQP', 'sigla pqp'],
   ['prr', 'sigla prr'],
   ['puta', 'puta'],
-  ['puto', 'puto'],
   ['putinha', 'putinha'],
   ['puta que pariu', 'puta que pariu'],
   ['que porra é essa', 'que porra é essa'],
@@ -198,7 +185,7 @@ const SHOULD_BLOCK_CASES: [string, string][] = [
   ['wtf', 'sigla wtf'],
 ];
 
-// Casos que NÃO DEVEM ser bloqueados (proteção contra falsos positivos)
+// Casos que NÃO DEVEM ser bloqueados (proteção contra falsos positivos e termos liberados)
 const SHOULD_ALLOW_CASES: [string, string][] = [
   ['O documento oficial da Igreja foi publicado hoje.', 'documento contém "cum" e "cu"'],
   ['Precisamos cumprir os mandamentos e acumular virtudes.', 'cumprir e acumular contêm "cum"'],
@@ -221,7 +208,7 @@ const SHOULD_ALLOW_CASES: [string, string][] = [
   ['Comemos lagosta na encosta da praia.', 'lagosta/encosta não batem em "bosta"'],
   ['Fomos ao mercado depois do mergulho.', 'mercado/mergulho não batem em "merda"'],
   ['Lemos o Salmo 167 e o livro de 1967.', '167 e 1967 não batem em "67"'],
-  ['Excelente explicação, exceto por um pequeno detalhe.', 'excelente/exceto não devem bater em "excomun*"'],
+  ['Excelente explicação, exceto por um pequeno detalhe.', 'excelente/exceto permitidos'],
   ['Esse argumento é válido, não é inválido nem irregular.', 'válido/inválido/irregular permitidos'],
   ['A Guarda Suíça protege o Papa em Roma.', 'Suíça permitida'],
   ['Vou lavar a louça depois do jantar.', 'louça em contexto normal permitida'],
@@ -231,6 +218,10 @@ const SHOULD_ALLOW_CASES: [string, string][] = [
   ['O Níger é um país da África.', 'Níger (1 g) não deve bater em nigg*'],
   ['Isso é baseado nos escritos de Santo Tomás.', 'baseado em português normal não deve bater em based'],
   ['Veja o link https://discord.com/channels/1433444059233517578/2020207', 'URLs ignoradas'],
+  ['A fraternidade cristã une os fiéis.', 'fraternidade liberada no commit f41976b'],
+  ['Lutero foi excomungado como herege pela Igreja.', 'excomungado/herege liberados no commit f41976b'],
+  ['A sede vacante ocorre após a morte de um Papa.', 'vacante liberado no commit f41976b'],
+  ['Meu pai foi à missa hoje e meus pais rezaram o terço.', '"meu pai" / "meus pais" jamais devem bater em "meu pal"'],
 ];
 
 console.log('🔍 Executando suíte de testes do motor anti-ofuscação do Torquemada...\n');
@@ -265,20 +256,32 @@ assert.ok(findBlockedWord('xX_m4c4c0_Xx', DEFAULT_BADWORDS_PRESET) !== null, 'Ni
 assert.equal(findBlockedWord('Marcelo_Catolico', DEFAULT_BADWORDS_PRESET), null, 'Nickname Marcelo_Catolico deve ser permitido');
 passed += 2;
 
-// Teste de Severidade em 2 Níveis + Extração de Trecho Exato (matchedText) e Destaque (highlightedText)
+// Teste de Severidade em 3 Níveis + Extração de Trecho Exato (matchedText) e Destaque (highlightedText)
 const severeRes = findBlockedWordDetailed('Oi, seu m.a.c.a.c.o idiota!', DEFAULT_BADWORDS_PRESET);
-assert.equal(severeRes?.severity, 'severe', 'Ofensa racista deve ter severidade "severe" (Timeout)');
+assert.equal(severeRes?.severity, 'severe', 'Ofensa racista deve ter severidade "severe" (Nível 1 - Timeout)');
 assert.equal(severeRes?.matchedText, 'm.a.c.a.c.o', 'Deve extrair exatamente o trecho ofuscado da mensagem original');
 assert.equal(severeRes?.highlightedText, 'Oi, seu **[m.a.c.a.c.o]** idiota!', 'Deve destacar o trecho exato na mensagem original');
 
+const profanityFodaRes = findBlockedWordDetailed('caramba isso é foda demais', DEFAULT_BADWORDS_PRESET);
+assert.equal(profanityFodaRes?.severity, 'profanity', '"foda" deve ter severidade "profanity" (Nível 2 - Palavrão Comum, sem Timeout)');
+assert.equal(profanityFodaRes?.matchedText, 'foda', 'Deve extrair "foda"');
+
+const profanityMerdaRes = findBlockedWordDetailed('que m.e.r.d.a aconteceu aqui', DEFAULT_BADWORDS_PRESET);
+assert.equal(profanityMerdaRes?.severity, 'profanity', '"merda" deve ter severidade "profanity" (Nível 2 - Palavrão Comum, sem Timeout)');
+assert.equal(profanityMerdaRes?.matchedText, 'm.e.r.d.a', 'Deve extrair "m.e.r.d.a"');
+
 const moderateRes = findBlockedWordDetailed('isso é c i s m a na certa', DEFAULT_BADWORDS_PRESET);
-assert.equal(moderateRes?.severity, 'moderate', 'Termo de cisma deve ter severidade "moderate" (Warn)');
+assert.equal(moderateRes?.severity, 'moderate', 'Termo de cisma deve ter severidade "moderate" (Nível 3 - Termo Restrito)');
 assert.equal(moderateRes?.matchedText, 'c i s m a', 'Deve extrair o trecho espaçado exato');
 assert.equal(moderateRes?.highlightedText, 'isso é **[c i s m a]** na certa', 'Deve destacar o trecho espaçado');
 
-const mixedRes = findBlockedWordDetailed('mambo e v14d0 na mesma mensagem', DEFAULT_BADWORDS_PRESET);
-assert.equal(mixedRes?.severity, 'severe', 'Mensagem mista deve priorizar a punição grave ("severe")');
-assert.equal(mixedRes?.matchedText, 'v14d0', 'Deve extrair o trecho da ofensa mais grave');
+const mixedProfanityModerate = findBlockedWordDetailed('mambo e v14d0 na mesma mensagem', DEFAULT_BADWORDS_PRESET);
+assert.equal(mixedProfanityModerate?.severity, 'profanity', 'Mensagem com Nível 3 + Nível 2 deve priorizar Nível 2 ("profanity")');
+assert.equal(mixedProfanityModerate?.matchedText, 'v14d0', 'Deve extrair o trecho de Nível 2');
+
+const mixedSevereProfanity = findBlockedWordDetailed('foda e n1gg3r na mesma mensagem', DEFAULT_BADWORDS_PRESET);
+assert.equal(mixedSevereProfanity?.severity, 'severe', 'Mensagem com Nível 2 + Nível 1 deve priorizar Nível 1 ("severe")');
+assert.equal(mixedSevereProfanity?.matchedText, 'n1gg3r', 'Deve extrair o trecho de Nível 1');
 
 const regionalRes = findBlockedWordDetailed('olha isso 🇲🇦🇨🇦🇨🇴 aqui', DEFAULT_BADWORDS_PRESET);
 assert.equal(regionalRes?.matchedText, '🇲🇦🇨🇦🇨🇴', 'Deve extrair emojis regionais corretamente');
@@ -287,7 +290,10 @@ assert.equal(regionalRes?.highlightedText, 'olha isso **[🇲🇦🇨🇦🇨�
 const customSevereRes = findBlockedWordDetailed('usando p.a.l.a.v.r.a.x proibida', ['!palavrax']);
 assert.equal(customSevereRes?.severity, 'severe', 'Palavra customizada com ! deve ter severidade "severe"');
 assert.equal(customSevereRes?.matchedText, 'p.a.l.a.v.r.a.x', 'Deve extrair palavra customizada ofuscada');
-passed += 11;
+
+const customProfanityRes = findBlockedWordDetailed('usando p.a.l.a.v.r.a.y proibida', ['?palavray']);
+assert.equal(customProfanityRes?.severity, 'profanity', 'Palavra customizada com ? deve ter severidade "profanity"');
+passed += 19;
 
 console.log(`✅ Testes concluídos: ${passed} aprovados, ${failed} falhas.`);
 if (failed > 0) {
